@@ -35,13 +35,7 @@ function run_model_tests_and_build()
     % Step 4: traceability report regeneration
     fprintf('[ci] Step 4: regenerating traceability report\n');
     try
-        if exist('slreq.generateReport', 'file') == 2
-            slreq.generateReport('missile', ...
-                fullfile(repo_root, 'traceability_report.html'));
-            fprintf('[ci] Traceability report regenerated\n');
-        else
-            fprintf('[ci] Simulink Requirements Toolbox not available; skipping report\n');
-        end
+        generate_traceability_report();
     catch err
         fprintf('[ci] Traceability regen failed (non-fatal): %s\n', err.message);
     end
