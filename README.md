@@ -118,8 +118,69 @@ overclaimed.
 
 <div align="center">
 
-*(Figures placeholder: model top-level, TPN block, kinematic block,
-regression traceability report to be added once .slx is authored.)*
+![Top-level model](docs/img/model_top_level.png)
+
+*Figure 1: Top-level model. Root inports `r_T`, `v_T`, `t` on the
+left. `GuidanceSubsystem` computes commanded lateral acceleration.
+`KinematicSubsystem` integrates it into missile velocity and position.
+`TerminationSubsystem` decides when the engagement ends. Root outports
+`r_M_out`, `v_M_out`, `term_flag_out` on the right.*
+
+</div>
+
+<div align="center">
+
+![Guidance subsystem internals](docs/img/guidance_internals.png)
+
+*Figure 2: Inside `GuidanceSubsystem`. `LOS_Rate` computes the
+inertial line-of-sight angular rate and closing velocity from the
+target-missile relative geometry. `TPN_Law` scales the LOS rate by
+`N * Vc` to produce the commanded acceleration. `Sat_a_cmd`
+saturates the commanded acceleration magnitude to the airframe
+envelope while preserving direction. Closing velocity is tapped out
+to `TerminationSubsystem` for the LOS-reversal miss detector.*
+
+</div>
+
+<div align="center">
+
+![Kinematic subsystem internals](docs/img/kinematic_internals.png)
+
+*Figure 3: Inside `KinematicSubsystem`. Two integrators in series:
+`Integrate_v` integrates commanded acceleration into missile velocity
+(initial condition = lead-collision-course launch velocity computed
+in `missile_params.m`); `Integrate_r` integrates velocity into
+missile position (initial condition = launch location `R_M0`). The
+integrators break the guidance feedback loop by construction, no
+algebraic loop.*
+
+</div>
+
+<div align="center">
+
+![Termination subsystem internals](docs/img/termination_internals.png)
+
+*Figure 4: Inside `TerminationSubsystem`. Three checks run in
+parallel: `Intercept_Check` fires when miss distance falls below
+`R_LETHAL`; `Timeout_Check` fires at `T_MAX`; `LOS_Reversal_Check`
+fires when closing velocity goes negative after its peak (target has
+passed the missile). `Priority_Latch` (discrete sample time) picks
+the first-triggered condition and holds it, so subsequent triggers
+don't overwrite the outcome.*
+
+</div>
+
+<div align="center">
+
+![Intercept trajectory](docs/img/intercept_trajectory.png)
+
+*Figure 5: Smoke-sim intercept against the `lateral_crossing` scene.
+Target flies leftward at 100 m/s from initial range 5.1 km; missile
+launches with lead-collision-course velocity computed in
+`missile_params.m` and prop-nav mops up the residual geometry. Miss
+distance ~24 m at t~8.5 s, inside the 25 m lethal-radius envelope,
+so `Intercept_Check` fires (`term_flag = 1`). Verifies the full
+guidance -> kinematic -> termination pipeline end-to-end.*
 
 </div>
 
