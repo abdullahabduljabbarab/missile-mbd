@@ -1,0 +1,24 @@
+# MATLAB / Simulink build artefacts
+slprj/
+sccprj/
+*.slxc
+*.autosave
+*.asv
+*.m~
+
+# Simulink Coder / Embedded Coder output
+missile_ert_rtw/
+missile_grt_rtw/
+codegen_out/
+*.tmw
+
+# MATLAB session state
+.mat.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

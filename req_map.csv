@@ -1,0 +1,20 @@
+ReqID,Block,Description
+REQ-MSL-001,missile/GuidanceSubsystem/TPN_Law,Guidance law shall compute a_cmd equals N times Vc times omega_LOS
+REQ-MSL-002,missile/GuidanceSubsystem/LOS_Rate,Line-of-sight angular rate shall be computed as cross product of r and r_dot divided by magnitude of r squared
+REQ-MSL-003,missile/GuidanceSubsystem/Closing_Velocity,Closing velocity shall be computed as negative rate of change of target-missile range
+REQ-MSL-004,model/missile_params.m,Navigation constant N shall be a configurable model parameter with default value 4
+REQ-MSL-005,missile/GuidanceSubsystem/Sat_a_cmd,Commanded lateral acceleration magnitude shall be saturated to LATAX_MAX
+REQ-MSL-006,model/missile_params.m,LATAX_MAX shall be a configurable model parameter in metres per second squared
+REQ-MSL-007,missile/GuidanceSubsystem/Sat_a_cmd,Saturation shall preserve the direction of the commanded acceleration vector
+REQ-MSL-008,missile/KinematicSubsystem/Integrate_v,Missile velocity shall be updated by integrating saturated commanded acceleration
+REQ-MSL-009,missile/KinematicSubsystem/Integrate_r,Missile position shall be updated by integrating missile velocity
+REQ-MSL-010,model/missile_params.m,Initial missile velocity magnitude V_M0 shall be a configurable model parameter
+REQ-MSL-011,missile/TerminationSubsystem/Intercept_Check,Intercept shall be declared when target-missile range falls below R_LETHAL
+REQ-MSL-012,missile/TerminationSubsystem/Timeout_Check,Timeout shall be declared when simulation time exceeds T_MAX
+REQ-MSL-013,missile/TerminationSubsystem/LOS_Reversal_Check,LOS reversal termination shall be declared when closing velocity becomes negative after peak
+REQ-MSL-014,missile/r_T,Root inport r_T shall accept target position in metres inertial frame
+REQ-MSL-015,missile/v_T,Root inport v_T shall accept target velocity in metres per second inertial frame
+REQ-MSL-016,missile/t,Root inport t shall accept elapsed engagement time in seconds
+REQ-MSL-017,missile/r_M_out,Root outport r_M_out shall expose missile position in metres inertial frame
+REQ-MSL-018,missile/v_M_out,Root outport v_M_out shall expose missile velocity in metres per second inertial frame
+REQ-MSL-019,missile/term_flag_out,Root outport term_flag_out shall expose termination state 0 in-flight 1 intercept 2 timeout 3 LOS reversal
