@@ -91,9 +91,10 @@ make it well-suited to a portfolio artefact:
 - **Well-studied.** Zarchan's *Tactical and Strategic Missile Guidance*
   covers the derivation, stability, and miss-distance analytics in
   depth. There is a textbook right answer to compare against.
-- **Real-world direct.** MBDA's own portfolio (Meteor, ASRAAM, Aster,
-  Sea Ceptor) all use variants of proportional navigation with
-  augmentations. Naming the law lands with any defence-sim audience.
+- **Real-world direct.** Every fielded medium- to long-range anti-air
+  missile in service uses a variant of proportional navigation
+  (augmented PN, biased PN, optimal PN). Naming the law lands with
+  any defence-sim audience.
 - **Simple to state, harder to get right.** The law is one equation.
   Coordinate frames, closing-velocity sign conventions, and LOS-rate
   computation are where implementations diverge. The right REQ set
@@ -447,7 +448,7 @@ AIM-120B - `Kind: Munition (2) / Domain: Surface (3) / Country: UK
 (224) / Category: 2 Guided / Subcategory: 8 AIM-120 family /
 Specific: 3 B-model`. Surface domain is honest for a surface-launched
 SAM even though the AMRAAM is nominally an air-launched weapon; here
-it's the warhead of a NASAMS-style ground battery. `Location in World
+it's the warhead of a surface-launched SAM battery. `Location in World
 Coordinates` carries the launcher's world-frame metres; `Range`
 carries the straight-line launcher-to-target distance at launch (not
 an effective-range spec value).*
