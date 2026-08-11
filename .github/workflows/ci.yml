@@ -29,24 +29,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+      - name: Set up MATLAB (retries setup-matlab in case MathWorks batch tokens flake on first-time provisioning)
+        uses: Wandalen/wretry.action@v3
         with:
-          # Pinned to R2026a to match the release the model is saved in.
-          release: R2026a
-          # Full product list matches autopilot-mbd and radar-mbd (both
-          # passing on R2026a). Embedded_Coder / MATLAB_Coder /
-          # Simulink_Coder can't be licensed at runtime on free runners,
-          # but they need to be requested at setup for batch licence
-          # acquisition to succeed. The rtwbuild() call inside
-          # run_model_tests_and_build.m is wrapped in try/catch so the
-          # unlicensable codegen fails soft.
-          products: >
-            Simulink
-            Simulink_Test
-            Embedded_Coder
-            MATLAB_Coder
-            Simulink_Coder
+          action: matlab-actions/setup-matlab@v2
+          with: |
+            release: R2026a
+            products: >
+              Simulink
+              Simulink_Test
+              Embedded_Coder
+              MATLAB_Coder
+              Simulink_Coder
+          attempt_limit: 5
+          attempt_delay: 60000
 
       - name: Run model tests + build script
         uses: matlab-actions/run-command@v2
