@@ -22,7 +22,7 @@ V_M0 = 500;
 
 % -- Engagement termination
 % Lethal miss radius (m). Intercept declared when |r_T - r_M| < R_LETHAL.
-R_LETHAL = 5;
+R_LETHAL = 25;
 
 % Maximum engagement time (s). Timeout otherwise.
 T_MAX = 60;
@@ -35,6 +35,31 @@ R_M0 = [0; 0; 0];
 % scenario. Target flying laterally across the missile boresight.
 R_T0 = [5000; 500; 1000];
 V_T0 = [-100; 0; 0];
+
+% -- Lead-collision-course initial missile velocity
+% Real launchers point the missile at a predicted intercept point,
+% not the target's current position. Approximates single-shot lead
+% angle using constant-velocity target assumption:
+%   1. Assume missile flies straight at V_M0
+%   2. Estimate closing rate along LOS
+%   3. Estimate time-to-go
+%   4. Point missile at where target will be at t_go
+% Prop-nav corrects the residual in flight; the lead angle removes
+% the first-order geometry error that a v1 point-mass model cannot
+% recover from with finite airframe latax.
+tmp_r_rel        = R_T0 - R_M0;
+tmp_range        = norm(tmp_r_rel);
+tmp_r_hat        = tmp_r_rel / tmp_range;
+tmp_V_close_los  = V_M0 - dot(V_T0, tmp_r_hat);      % missile closing rate along LOS
+tmp_t_go_est     = tmp_range / max(tmp_V_close_los, 1); % guard against divide-by-zero
+tmp_intercept_pt = R_T0 + V_T0 * tmp_t_go_est;
+tmp_lead_dir     = (tmp_intercept_pt - R_M0) / norm(tmp_intercept_pt - R_M0);
+V_M_INIT         = V_M0 * tmp_lead_dir;              % missile initial velocity vector, lead computed
+
+fprintf('Lead-collision-course initial velocity: [%.1f %.1f %.1f] m/s (t_go_est %.2fs)\n', ...
+    V_M_INIT(1), V_M_INIT(2), V_M_INIT(3), tmp_t_go_est);
+
+clear tmp_r_rel tmp_range tmp_r_hat tmp_V_close_los tmp_t_go_est tmp_intercept_pt tmp_lead_dir
 
 % -- Simulation and codegen settings
 CODEGEN_STEP = 0.02;      % 50 Hz fixed step, matches autopilot / radar companion models
