@@ -189,21 +189,117 @@ guidance -> kinematic -> termination pipeline end-to-end.*
 ## Reusable-function code generation
 
 The model is configured (`tools/configure_reusable_function.m`) with
-**Code Interface Packaging = Reusable function**. Generated entry
-points take a per-instance model pointer:
+**Code Interface Packaging = Reusable function** and RT_MALLOC packaging.
+The generated entry points expose the model's root I/O directly as
+buffers passed in by the caller, plus a factory that allocates the
+per-instance state:
 
 ```c
-void missile_initialize(RT_MODEL_missile_T *rtM);
-void missile_step      (RT_MODEL_missile_T *rtM);
-void missile_terminate (RT_MODEL_missile_T *rtM);
+/* Allocates one instance, wires the caller's I/O buffers to the
+   model root ports, returns an opaque handle. */
+RT_MODEL_missile_T *missile(real_T r_T[3], real_T v_T[3], real_T *t,
+                            real_T r_M_out[3], real_T v_M_out[3],
+                            real_T *term_flag_out);
+
+void missile_initialize(RT_MODEL_missile_T *M);
+void missile_step      (RT_MODEL_missile_T *M,
+                        real_T r_T[3], real_T v_T[3], real_T t,
+                        real_T r_M_out[3], real_T v_M_out[3],
+                        real_T *term_flag_out);
+void missile_terminate (RT_MODEL_missile_T *M);
 ```
 
 Every field of the run-time state (`blockIO`, `contStates`, `inputs`,
 `outputs`, LOS memory) lives inside the `RT_MODEL_missile_T` struct
-pointed to by `rtM`. Consumers allocate one per in-flight missile.
-There are **no file-scope globals** and no shared state between
-instances, a salvo of any size runs concurrently on the same
+pointed to by `M`. Consumers allocate one per in-flight missile via
+the factory. There are no shared globals for guidance state between
+instances, so a salvo of any size runs concurrently on the same
 generated `.c`.
+
+---
+
+## Known limitations
+
+The model is a scoped teaching artefact, not a fielded interceptor.
+These are the boundaries in one place, so you don't hit them mid-demo:
+
+- **`V_M_INIT` is baked at model build time.** `missile_params.m`
+  computes the lead-collision-course initial missile velocity from the
+  default `R_T0` / `V_T0` scenario values and passes it into the
+  `Integrate_v` block as a compile-time constant initial condition. As
+  a result, the generated `missile.c` only runs the guidance loop
+  correctly against the specific `lateral_crossing` scene it was
+  authored for. On arbitrary launch geometries the missile boosts in
+  the wrong direction and `LOS_Reversal_Check` can trip on the first
+  tick. The proper fix is to add a `v_M0` root inport wired to
+  `Integrate_v`'s IC pin (`InitialConditionSource = external`) and
+  regenerate. Until then, `missile.slx` is only demo-valid against the
+  authored scenario. The CLEARANCE integration works around this by
+  bypassing `missile_step` in its wrapper (see below).
+- **Missile speed is constant-magnitude.** There is no thrust profile
+  or drag model. `V_M0 = 500 m/s` is applied to a unit lead direction
+  and integrated forward. No burnout, no coast, no gravity drop.
+- **Kinematic 3-DOF, no airframe.** The commanded lateral acceleration
+  is applied directly to the velocity vector. No aerodynamic response
+  lag, no fin actuator dynamics, no seeker gimbal.
+- **Perfect target observability.** The model assumes the target's
+  position and velocity are known exactly. Seeker noise, angle-only
+  tracking, and radome error are downstream problems.
+- **Termination is proximity only.** `R_LETHAL = 25 m` triggers
+  intercept; there is no warhead fragmentation kinematics, no fuze
+  model, no proximity-vs-impact distinction beyond the DIS
+  `DetonationResult` code the integration stamps at report time.
+
+## Bugs encountered during CLEARANCE integration
+
+Integrating the generated C into a live sim surfaced issues that the
+standalone smoke sim never touched. Documented here so the same
+diagnostic path doesn't have to be re-walked:
+
+- **`V_M_INIT` bake breaks arbitrary launches.** Direct consequence of
+  the limitation above. Symptom: `term_flag = 3` (LOS reversal) fires
+  on the first tick when the scenario differs from the authored
+  `lateral_crossing`, because the baked-in initial velocity puts the
+  missile on a trajectory the target has effectively already passed.
+  **Workaround in the CLEARANCE wrapper**: `FMissileWrapper::Step`
+  currently short-circuits `missile_step` and runs a straight-line
+  pursuit computed directly in C++. The generated C compiles, links,
+  and is called every tick (state allocation + init still exercise
+  the model), but the guidance decision is placeholder until the
+  `v_M0` inport regen ships.
+- **Time-scale mismatch swallowed the missile.** CLEARANCE runs
+  aircraft physics at 10x wall-clock (`SimulationTimeScale = 10`); the
+  missile wrapper was ticking on unscaled wall-clock `DeltaSeconds` for
+  its integration step. Effective missile ground speed was 1/10 the
+  target's ground speed - the missile could never catch anything. Fix:
+  wrapper pre-multiplies its `DeltaSeconds` by `SimulationTimeScale`
+  before the guidance step so both live in the same time frame.
+- **Actor world coords didn't match sim coords.** CLEARANCE compresses
+  its world (`WorldUnitsPerNm = 1000`, `AltitudeWorldScale = 2`) so
+  raw meters * 100 puts a launcher-anchored missile at ~150 million UE
+  units offscreen. Fix: missile actor sets its transform via
+  `SimulationController::WorldPositionFor(state)` - the same projection
+  aircraft visuals use - so mesh + chase camera share one coordinate
+  system.
+- **Chase camera rubber-banded at high FPS.** `bReplicates=true` +
+  `SetReplicateMovement(true)` enabled the SimulatedProxy movement
+  smoother which chases authoritative-position updates one frame late.
+  At 60 fps that lag is visible; at 2-3 fps everything updates in the
+  same visible frame so it reads as smooth. Mitigation: transform is
+  driven from replicated `AirspaceManager` state on both server and
+  client (same pattern aircraft visuals use), movement replication
+  disabled. Residual sub-frame jitter remains, cosmetic only.
+- **Straight-up VLS boost had no yaw.** Follow camera in CLEARANCE was
+  yaw-only for aircraft; a boost-phase missile has no meaningful yaw
+  so the camera framed empty sky. Fix: `UpdateFollowCamera` branches on
+  `bIsMissile` and uses the full 3D velocity vector as Forward.
+- **Missile emitted as light aircraft over DIS.** The default entity-
+  type mapping used the aircraft's WakeCategory, so external federates
+  saw a "Kind 1 Platform Air" instead of a "Kind 2 Munition". Fix:
+  emitter branches on `bIsMissile` and stamps SISO-REF-010 AIM-120B
+  fields (`Kind=2, Domain=3, Country=225, Category=2, Subcat=8, Spec=3`).
+  Fire/Detonation PDUs' `MunitionEntity` field now matches the flying
+  missile's own EntityState PDU ID so observers can correlate the two.
 
 ---
 
@@ -321,9 +417,58 @@ module (mirrors the pattern of `ClearanceAutopilotMBD` and
 Console commands in-sim:
 
 ```
-clearance.missile.fire <launcher_callsign> <target_callsign>
-clearance.missile.abort <missile_id>
+clearance.missile.fire  <target_callsign>   # SAM launched at the aircraft
+clearance.missile.abort                     # destroys every in-flight missile
+clearance.missile.test                      # offline wrapper smoke test
 ```
+
+The launcher is picked automatically from the first placed
+`AClearanceMissileLauncher` actor in the level (fallback: spawn 20 km
+behind target with a warning log if none is placed). Multiple
+batteries with distinct `LauncherCallsign` are supported at the
+storage layer; nearest-launcher selection is a scenario-authoring
+concern for later.
+
+### Wire evidence
+
+Both PDUs land on the wire per IEEE 1278.1-2012 and decode cleanly in
+Wireshark's built-in DIS dissector with no custom Lua plugin. Loopback
+capture, filter `dis.pdu_type == 2 || dis.pdu_type == 3`:
+
+<div align="center">
+
+![Fire PDU (Type 2) for the ground-launched SAM decoded in Wireshark](docs/img/wireshark-fire-pdu.png)
+
+*Figure 7: Fire PDU (Type 2, §7.4.3) at the instant the SAM is fired.
+PDU Length 96 bytes. Firing / Target / Munition entity IDs populated,
+Event Number stamped for pairing with the matching Detonation.
+**Burst Descriptor decoded as `Munition, (2:3:224:2:8:3:0)`**: SISO-REF-010
+AIM-120B - `Kind: Munition (2) / Domain: Surface (3) / Country: UK
+(224) / Category: 2 Guided / Subcategory: 8 AIM-120 family /
+Specific: 3 B-model`. Surface domain is honest for a surface-launched
+SAM even though the AMRAAM is nominally an air-launched weapon; here
+it's the warhead of a NASAMS-style ground battery. `Location in World
+Coordinates` carries the launcher's world-frame metres; `Range`
+carries the straight-line launcher-to-target distance at launch (not
+an effective-range spec value).*
+
+</div>
+
+<div align="center">
+
+![Detonation PDU (Type 3) for the SAM engagement decoded in Wireshark](docs/img/wireshark-detonation-pdu.png)
+
+*Figure 8: Detonation PDU (Type 3, §7.4.4) at the resolution of the
+same SAM engagement as Figure 7, PDU Length 104 bytes. Paired with
+the earlier Fire PDU by matching `Firing Entity ID`, `Target Entity
+ID`, `Munition Entity ID`, and `Event Number` - the four properties
+DIS observers are contracted to key on. Full
+`Burst Descriptor (2:3:224:2:8:3:0)` also mirrors the Fire PDU so a
+federation observer can classify the round independently of the Fire
+history. `Detonation Result: Entity Impact (1)` confirms the missile
+achieved proximity intercept on the target aircraft.*
+
+</div>
 
 ## Continuous integration
 

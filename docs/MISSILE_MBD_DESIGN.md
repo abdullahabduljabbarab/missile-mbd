@@ -121,13 +121,22 @@ an `RT_MODEL_missile_T` struct that the caller allocates. Every entry
 point takes a pointer:
 
 ```c
-void missile_initialize(RT_MODEL_missile_T *rtM);
-void missile_step      (RT_MODEL_missile_T *rtM);
-void missile_terminate (RT_MODEL_missile_T *rtM);
+/* Factory: allocates an instance, wires the caller's I/O buffers to
+   the model's root inports/outports, returns the handle. */
+RT_MODEL_missile_T *missile(real_T r_T[3], real_T v_T[3], real_T *t,
+                            real_T r_M_out[3], real_T v_M_out[3],
+                            real_T *term_flag_out);
+
+void missile_initialize(RT_MODEL_missile_T *M);
+void missile_step      (RT_MODEL_missile_T *M,
+                        real_T r_T[3], real_T v_T[3], real_T t,
+                        real_T r_M_out[3], real_T v_M_out[3],
+                        real_T *term_flag_out);
+void missile_terminate (RT_MODEL_missile_T *M);
 ```
 
-CLEARANCE allocates one per in-flight missile. A salvo of any size
-runs concurrently without any shared state.
+CLEARANCE allocates one per in-flight missile via the factory. A
+salvo of any size runs concurrently without any shared state.
 
 Codegen target is `ert.tlc` (Embedded Real-Time) with fixed-step
 solver at 0.02 s (50 Hz), ode4. Matches the autopilot / radar
@@ -199,12 +208,22 @@ theoretical (defined but unused) to load-bearing:
 Both PDUs go out on all four federation wires (DIS, Fast DDS, RTI
 Connext, HLA) so any subscribing federate sees the weapon engagement.
 
+Both PDUs on DIS also stamp the munition with the SISO-REF-010
+AIM-120B entity type (`Kind 2 Munition, Domain 3 Anti-Air`) and the
+`MunitionEntity` field matches the flying missile's own EntityState
+PDU ID so a federation observer can correlate the paired traffic.
+
 Console commands in-sim:
 
 ```
-clearance.missile.fire  <launcher_callsign> <target_callsign>
-clearance.missile.abort <missile_id>
+clearance.missile.fire  <target_callsign>   # SAM launched at aircraft
+clearance.missile.abort                     # destroys every in-flight
+clearance.missile.test                      # offline wrapper smoke test
 ```
+
+The launcher is selected automatically from any placed
+`AClearanceMissileLauncher` actor in the level (fallback: 20 km
+behind target with a warning log).
 
 ## What's not in here
 

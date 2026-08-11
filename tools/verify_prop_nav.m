@@ -16,11 +16,11 @@ function verify_prop_nav()
     fprintf('[verify_prop_nav] Running smoke sim against lateral_crossing scene...\n');
 
     % Sim assumes the missile.slx model is on path and configured to read
-    % the scene inputs from the base workspace. This is a placeholder that
-    % becomes the real assertion once the model exists.
+    % the scene inputs (r_T, v_T) from the base workspace. Safety guard so a
+    % pruned checkout without the .slx doesn't fail with a confusing error.
     if ~exist('missile.slx', 'file') && ~exist('missile', 'file')
         warning('verify_prop_nav:model_missing', ...
-            'missile.slx not found. Author the Simulink model first, then rerun.');
+            'missile.slx not found on path. Add the model directory or repository root to path and rerun.');
         return
     end
 
