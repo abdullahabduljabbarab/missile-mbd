@@ -45,15 +45,31 @@ catch ME
     warning('generate_traceability_report failed: %s', ME.message);
 end
 
-% 6) Attempt code generation/build (best-effort on unlicensed runners)
-try
-    fprintf('Attempting model build/codegen (slbuild)...\n');
-    buildOutput = slbuild(model);
-    genFolder = fullfile(pwd,[model '_grt_rtw']);
-    if isfolder(fullfile(pwd,'slprj')), copyfile(fullfile(pwd,'slprj'), fullfile(artifactsDir,'slprj')); end
-    if isfolder(genFolder), copyfile(genFolder, fullfile(artifactsDir,'codegen')); end
-catch ME
-    warning('slbuild failed or not configured: %s', ME.message);
+% 6) Attempt code generation/build (optional on hosted CI)
+fprintf('Checking code generation availability...\n');
+hasSimulinkCoder = license('test','Real-Time_Workshop');
+hasEmbeddedCoder = license('test','RTW_Embedded_Coder');
+if ~(hasSimulinkCoder || hasEmbeddedCoder)
+    fprintf(['Skipping code generation - Simulink Coder / Embedded Coder ' ...
+             'licence unavailable on this runner.\n']);
+else
+    try
+        fprintf('Attempting model build/codegen (slbuild)...\n');
+        buildOutput = slbuild(model); %#ok<NASGU>
+        fprintf('Code generation completed successfully.\n');
+        if isfolder(fullfile(pwd,'slprj'))
+            copyfile(fullfile(pwd,'slprj'), fullfile(artifactsDir,'slprj'));
+        end
+        generatedFolders = { [model '_grt_rtw'], [model '_ert_rtw'] };
+        for i = 1:numel(generatedFolders)
+            src = fullfile(pwd, generatedFolders{i});
+            if isfolder(src)
+                copyfile(src, fullfile(artifactsDir, generatedFolders{i}));
+            end
+        end
+    catch ME
+        warning('Code generation failed after licence availability check: %s', ME.message);
+    end
 end
 
 % 7) Snapshot workspace

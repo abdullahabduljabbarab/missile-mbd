@@ -1,14 +1,14 @@
-# Simulink missile CI. Loads the model, runs the smoke sim + any
-# Test Manager cases, attempts code generation via rtwbuild (the
-# script tolerates a licence-checkout failure so the run stays green
-# on free GitHub-hosted runners), regenerates the traceability
-# report, and uploads everything under ci_artifacts/.
+# Simulink missile CI. Loads the model, runs the smoke sim + any Test
+# Manager cases, regenerates the traceability report, and uploads
+# everything under ci_artifacts/. Code generation (slbuild) is optional
+# on hosted runners: the script probes for a Simulink Coder / Embedded
+# Coder licence before attempting slbuild and cleanly skips otherwise.
 #
-# Simulink and Simulink Test licences are covered by the free
-# matlab-actions/setup-matlab@v2 batch tokens; Simulink Coder / MATLAB
-# Coder / Embedded Coder are not, so the codegen portion is
-# best-effort on public runners and green-guaranteed on a licensed
-# MATLAB Server.
+# Simulink and Simulink Test are covered by MathWorks' free hosted-CI
+# batch tokens for public repos. Coder-family products (Simulink Coder,
+# MATLAB Coder, Embedded Coder) require paid licences that hosted
+# runners don't get, so we don't ask for them here - codegen still runs
+# locally with a full toolchain and on a licensed MATLAB Server.
 #
 # Trigger: manual dispatch only, matching the CLEARANCE-side pipeline.
 
@@ -18,31 +18,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  model-tests-and-codegen:
-    name: Model tests + Embedded Coder codegen
-    # Pin BOTH the runner AND the MATLAB release so the toolchain match works:
-    # - windows-2022 ships Visual Studio 2022 as its C++ baseline
-    # - MATLAB R2026a (pinned below) loads the model and knows the VS 2022 toolchain
+  model-tests:
+    name: Model tests + optional codegen
+    # windows-2022 pins Visual Studio 2022 as the C++ baseline so any
+    # codegen that DOES run (on a licensed self-hosted runner) matches
+    # the CLEARANCE-side toolchain.
     runs-on: windows-2022
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up MATLAB (retries setup-matlab in case MathWorks batch tokens flake on first-time provisioning)
-        uses: Wandalen/wretry.action@v3
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
         with:
-          action: matlab-actions/setup-matlab@v2
-          with: |
-            release: R2026a
-            products: >
-              Simulink
-              Simulink_Test
-              Embedded_Coder
-              MATLAB_Coder
-              Simulink_Coder
-          attempt_limit: 5
-          attempt_delay: 60000
+          release: R2026a
+          products: >
+            Simulink
+            Simulink_Test
 
       - name: Run model tests + build script
         uses: matlab-actions/run-command@v2
@@ -51,7 +44,6 @@ jobs:
             addpath(genpath(pwd));
             cd('tools');
             run_model_tests_and_build;
-            exit(0);
 
       - name: Upload sim + verification artefacts
         if: always()
