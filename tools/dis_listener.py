@@ -109,7 +109,11 @@ def parse_entity_state(buf: bytes) -> dict:
     (site, app, entity, force, _art,
      kind, domain, country, cat, subcat, spec, extra) = struct.unpack_from(
         ">HHHBBBBHBBBB", buf, off)
-    off += 18
+    # HHHBBBBHBBBB = 6 + 4 + 2 + 4 = 16 bytes (EntityID + ForceId/Art +
+    # first EntityType). The earlier off += 18 was an arithmetic slip
+    # and shifted every subsequent field by 2 bytes, which is why the
+    # decoded Location doubles came out with 10^30-plus exponents. - TripleA
+    off += 16
     # skip Alternative Entity Type (8 bytes)
     off += 8
     vx, vy, vz = struct.unpack_from(">fff", buf, off); off += 12
