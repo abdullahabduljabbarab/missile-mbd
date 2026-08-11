@@ -471,6 +471,25 @@ achieved proximity intercept on the target aircraft.*
 
 </div>
 
+<div align="center">
+
+![Two independent DIS decoders agreeing on the same wire traffic](docs/img/dis-independent-decoders.png)
+
+*Figure 9: Two independent IEEE 1278.1 decoders reading the same
+multicast traffic and producing matching output for three SAM
+engagements. **Right**: `tools/dis_listener.py`, the hand-rolled
+decoder in this repo (~230 LOC, standard library only). **Left**:
+`tools/opendis_listener.py`, backed by the third-party
+[open-dis-python](https://github.com/open-dis/open-dis-python)
+library authored by a different team. Firing Entity 1662,
+Munition Entity IDs (51306, 51965, 52624), Event Numbers, and
+`Result: 1 Entity Impact` all agree byte for byte across both
+decoders. Two independent implementations of the same spec
+agreeing on the same bytes is real IEEE 1278.1 compliance
+evidence: neither implementation is validating its own emitter.*
+
+</div>
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on manual dispatch (MATLAB licensing

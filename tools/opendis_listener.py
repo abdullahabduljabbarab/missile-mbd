@@ -92,35 +92,32 @@ def fmt_km(x: float, y: float, z: float) -> str:
     return f"({x/1000:+.2f}, {y/1000:+.2f}, {z/1000:+.2f}) km"
 
 
-def entity_id_int(entity_id) -> int:
-    """open-dis EntityID uses .site/.application/.entity; return the entity number."""
-    return getattr(entity_id, "entityID", getattr(entity_id, "entity", 0))
+def entity_num(entity_id) -> int:
+    """open-dis EntityID uses .siteID / .applicationID / .entityID."""
+    return getattr(entity_id, "entityID", 0)
 
 
 def print_fire(pdu: FirePdu) -> None:
-    firer  = entity_id_int(pdu.firingEntityID)
-    target = entity_id_int(pdu.targetEntityID)
-    muni   = entity_id_int(pdu.munitionEntityID)
-    event  = getattr(pdu.eventID, "eventNumber", getattr(pdu.eventID, "eventID", 0))
-    burst  = pdu.descriptor if hasattr(pdu, "descriptor") else pdu.burstDescriptor
-    mtype  = burst.munitionType if hasattr(burst, "munitionType") else burst.munition
-    loc    = pdu.locationInWorldCoordinates
-    kind, dom, ctry, cat, sub, spec = (
-        mtype.entityKind, mtype.domain, mtype.country,
-        mtype.category, mtype.subcategory, mtype.specific,
-    )
+    firer  = entity_num(pdu.firingEntityID)
+    target = entity_num(pdu.targetEntityID)
+    muni   = entity_num(pdu.munitionExpendableID)  # DIS 7 name for munition entity
+    event  = pdu.eventID.eventNumber
+    mtype  = pdu.descriptor.munitionType
+    loc    = pdu.location
+    kind, dom, ctry = mtype.entityKind, mtype.domain, mtype.country
+    cat, sub, spec = mtype.category, mtype.subcategory, mtype.specific
     print(f"[Fire  ] #{event:<5} firer={firer:>5} -> target={target:>5}  muni={muni:>5}  "
           f"type=({kind}:{dom}:{ctry}:{cat}:{sub}:{spec})")
     print(f"           at {fmt_km(loc.x, loc.y, loc.z)}")
 
 
 def print_detonation(pdu: DetonationPdu) -> None:
-    firer  = entity_id_int(pdu.firingEntityID)
-    target = entity_id_int(pdu.targetEntityID)
-    muni   = entity_id_int(pdu.munitionEntityID)
-    event  = getattr(pdu.eventID, "eventNumber", getattr(pdu.eventID, "eventID", 0))
+    firer  = entity_num(pdu.firingEntityID)
+    target = entity_num(pdu.targetEntityID)
+    muni   = entity_num(pdu.explodingEntityID)     # DIS 7 name for the munition
+    event  = pdu.eventID.eventNumber
     result = pdu.detonationResult
-    loc    = pdu.locationInWorldCoordinates
+    loc    = pdu.location
     result_name = DETONATION_RESULT_NAMES.get(result, f"code {result}")
     print(f"[Deton ] #{event:<5} firer={firer:>5} target={target:>5} muni={muni:>5}  "
           f"result={result} {result_name}")
@@ -131,17 +128,18 @@ def print_entity_state(pdu: EntityStatePdu, only_missiles: bool) -> None:
     et = pdu.entityType
     if only_missiles and et.entityKind != 2:
         return
-    entity = entity_id_int(pdu.entityID)
+    entity = entity_num(pdu.entityID)
     force  = FORCE_ID_NAMES.get(pdu.forceId, str(pdu.forceId))
     ctry   = COUNTRY_NAMES.get(et.country, str(et.country))
     loc    = pdu.entityLocation
     mark   = ""
-    if hasattr(pdu, "marking") and pdu.marking is not None:
-        raw = getattr(pdu.marking, "characters", b"") or b""
-        try:
-            mark = f'  mark="{bytes(raw).rstrip(b" ").rstrip(b"\x00").decode("ascii", errors="replace")}"'
-        except Exception:
-            mark = ""
+    try:
+        raw = bytes(pdu.marking.characters)
+        text = raw.rstrip(b" ").rstrip(b"\x00").decode("ascii", errors="replace")
+        if text:
+            mark = f'  mark="{text}"'
+    except Exception:
+        pass
     print(f"[State ] entity={entity:>5}  Kind {et.entityKind}/Dom {et.domain}/"
           f"Country {ctry}/{et.category}/{et.subcategory}/{et.specific}  force={force}")
     print(f"           at {fmt_km(loc.x, loc.y, loc.z)}{mark}")
