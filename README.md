@@ -304,6 +304,16 @@ diagnostic path doesn't have to be re-walked:
 
 ---
 
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [docs/MISSILE_MBD_DESIGN.md](docs/MISSILE_MBD_DESIGN.md) | Design brief: True Proportional Navigation guidance law, saturation, kinematic 3-DOF, termination. |
+| [docs/INTEGRATION.md](docs/INTEGRATION.md) | Integration status inside CLEARANCE, including the honest v1.0 live-guidance gap and the scoped production fix. |
+| [docs/V_AND_V_PLAN.md](docs/V_AND_V_PLAN.md) | Verification and validation plan. |
+| [DEVLOG.md](DEVLOG.md) | Chronological engineering journal. |
+| [Requirements.md](Requirements.md) | Requirements traced to their verifying blocks. |
+
 ## Repository layout
 
 ```
