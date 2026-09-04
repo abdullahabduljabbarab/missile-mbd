@@ -10,11 +10,13 @@
 # runners don't get, so we don't ask for them here - codegen still runs
 # locally with a full toolchain and on a licensed MATLAB Server.
 #
-# Trigger: manual dispatch only.
+# Trigger: every push, every PR, plus manual dispatch.
 
 name: CI
 
 on:
+  push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
