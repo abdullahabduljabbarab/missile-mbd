@@ -14,9 +14,11 @@ flight can run the same generated model concurrently without shared
 globals.
 
 Integrated live into the [CLEARANCE](https://github.com/abdullahabduljabbarab/CLEARANCE)
-ATC / air-defence simulator: every in-flight missile is driven by the
-Simulink-generated guidance law, each carrying its own kinematic
-state, LOS memory, and termination logic. Missile launches emit DIS
+ATC / air-defence simulator: every in-flight missile allocates and
+initialises its own instance of the Simulink-generated model (kinematic
+state, LOS memory, termination logic), while live guidance currently runs
+on a C++ pursuit fallback until the launch-velocity inport is regenerated.
+Missile launches emit DIS
 Fire PDUs (§7.4.3); intercepts emit Detonation PDUs (§7.4.4) into the
 existing federation stack. See [Integration with CLEARANCE](#integration-with-clearance)
 below.
